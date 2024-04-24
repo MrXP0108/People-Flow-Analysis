@@ -9,3 +9,8 @@ opencv-python
 imutils
 pillow
 matplotlib
+
+arch==5.3.1
+image_quality==1.2.7
+lpips==0.1.4
+einops==0.6.1

@@ -9,6 +9,8 @@ from detector.mapper import Mapper
 from util.mark_entrance import EntranceManager
 import numpy as np
 
+from enhancement.enhancement import Enhancer
+
 # 定义一个Detection类，包含id,bb_left,bb_top,bb_width,bb_height,conf,det_class
 class Detection:
 
@@ -112,6 +114,8 @@ def main(args):
     entrance_manager = EntranceManager(f'{args.source_folder}/{args.entrance_coords}')
     entrance_coords = entrance_manager.coords
 
+    enhancer = Enhancer(lol=True, perc=True)
+
     n_person = 0
     in_pos_count = [0]*len(entrance_manager.coords)
     out_pos_count = [0]*len(entrance_manager.coords)
@@ -124,6 +128,14 @@ def main(args):
         if not ret:
             break
         height, width = frame_img.shape[:2]
+
+        # low-light enhancement
+        # TODO: enhance if brightness is under some threshold
+        if frame_id % 100 == 10:
+            cv2.imwrite('temp/temp.png', frame_img)
+            enhancer.enhance()
+            frame_img = cv2.imread('temp/temp.png')
+
         if frame_id == 1:
             if height >= 700: entrance_manager.factor = 2.5
             if height <= 300:  entrance_manager.factor = 0.5
@@ -211,7 +223,8 @@ parser.add_argument('--detect_freq', type=int, default=10, help='frequency of YO
 parser.add_argument('--show_entrances', type=bool, default=True, help='show the bounding boxes of entrances or not')
 args = parser.parse_args()
 
-main(args)
+if __name__ == '__main__':
+    main(args)
 
 
 
