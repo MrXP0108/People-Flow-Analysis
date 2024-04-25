@@ -1,12 +1,14 @@
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import argparse
-from tqdm import tqdm
 from enhancement.data.data import *
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from enhancement.loss.losses import *
 from enhancement.net.CIDNet import CIDNet
+import numpy as np
+
+device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class Enhancer:
     def __init__(self, perc=False, lol=False, lol_v2_real=False, lol_v2_syn=False, \
@@ -51,30 +53,26 @@ class Enhancer:
             else:
                 weight_path = 'enhancement/weights/LOLv2_syn/DVCNet_epoch_320_best.pth'
 
-        # eval_net = CIDNet().cuda()
-        self.eval_net = CIDNet().cpu()
+        self.eval_net = CIDNet().to(device)
         self.eval_net.load_state_dict(torch.load(weight_path, map_location=lambda storage, loc: storage))
         self.eval_net.eval()
 
-    def enhance(self):
-        eval_data = DataLoader(dataset=get_eval_set('temp'), num_workers=1, batch_size=1, shuffle=False)
+    def enhance(self, img):
+        eval_data = torch.from_numpy(np.expand_dims(img, axis=0))
         torch.set_grad_enabled(False)
         if self.lol:
             self.eval_net.trans.gated = True
         else:
             self.eval_net.trans.gated2 = True
             self.eval_net.trans.alpha = self.alpha
-        for batch in eval_data:
-            with torch.no_grad():
-                input = batch[0].cpu()
-                # input = batch[0].cuda()
-                output = self.eval_net(input)
+        with torch.no_grad():
+            input = eval_data.cuda()
+            output = self.eval_net(input)
                 
-            # output = torch.clamp(output.cuda(),0,1).cuda()
-            output = torch.clamp(output.cpu(),0,1).cpu()
-            output_img = transforms.ToPILImage()(output.squeeze(0))
-            output_img.save('temp/temp.png')
-            torch.cuda.empty_cache()
+        output = torch.clamp(output.cuda(),0,1).cuda()
+        output_img = transforms.ToPILImage()(output.squeeze(0))
+        output_img.save('temp/temp.png')
+        torch.cuda.empty_cache()
         if self.lol:
             self.eval_net.trans.gated = False
         else:

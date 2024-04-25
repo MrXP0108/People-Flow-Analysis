@@ -1,3 +1,5 @@
+import torch
+from torchvision import transforms
 from ultralytics import YOLO
 from PIL import ImageFont, ImageDraw, Image
 import os,cv2
@@ -10,6 +12,8 @@ from util.mark_entrance import EntranceManager
 import numpy as np
 
 from enhancement.enhancement import Enhancer
+
+device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # 定义一个Detection类，包含id,bb_left,bb_top,bb_width,bb_height,conf,det_class
 class Detection:
@@ -46,24 +50,30 @@ class Detector:
 
     def load(self,cam_para_file):
         self.mapper = Mapper(cam_para_file,"MOT17")
-        self.model = YOLO(f'pretrained/yolov{args.yolo_version}.pt')
+        self.model = YOLO(f'pretrained/yolov{args.yolo_version}.pt').to(device)
 
     def get_dets(self, img,conf_thresh = 0,det_classes = [0]):
         
         global dets
         dets = []
 
-        # 将帧从 BGR 转换为 RGB（因为 OpenCV 使用 BGR 格式）  
-        frame = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  
+        height, width = img.shape[:2]
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize(size=(height, width))
+        ])
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_tensor = transform(img).unsqueeze(0)  # Add batch dimension
+        img_tensor.to(device)
 
         # 使用 RTDETR 进行推理  
-        results = self.model(frame)
+        results = self.model(img_tensor)
 
         det_id = 0
         for box in results[0].boxes:
-            conf = box.conf.cpu().numpy()[0]
-            bbox = box.xyxy.cpu().numpy()[0]
-            cls_id  = box.cls.cpu().numpy()[0]
+            conf = box.conf.to('cpu').numpy()[0]
+            bbox = box.xyxy.to('cpu').numpy()[0]
+            cls_id  = box.cls.to('cpu').numpy()[0]
             w = bbox[2] - bbox[0]
             h = bbox[3] - bbox[1]
             if w <= 20 and h <= 20 or cls_id not in det_classes or conf <= conf_thresh:
@@ -132,8 +142,7 @@ def main(args):
         # low-light enhancement
         # TODO: enhance if brightness is under some threshold
         if frame_id % 100 == 10:
-            cv2.imwrite('temp/temp.png', frame_img)
-            enhancer.enhance()
+            enhancer.enhance(cv2.cvtColor(frame_img, cv2.COLOR_BGR2RGB))
             frame_img = cv2.imread('temp/temp.png')
 
         if frame_id == 1:

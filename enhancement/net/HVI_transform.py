@@ -16,12 +16,12 @@ class RGB_HVI(nn.Module):
         eps = 1e-8
         device = img.device
         dtypes = img.dtype
-        hue = torch.Tensor(img.shape[0], img.shape[2], img.shape[3]).to(device).to(dtypes)
+        hue = torch.Tensor(img.shape[0], img.shape[2], img.shape[3]).to(device).float()
         value = img.max(1)[0].to(dtypes)
         img_min = img.min(1)[0].to(dtypes)
-        hue[img[:,2]==value] = 4.0 + ( (img[:,0]-img[:,1]) / (value - img_min + eps)) [img[:,2]==value]
-        hue[img[:,1]==value] = 2.0 + ( (img[:,2]-img[:,0]) / (value - img_min + eps)) [img[:,1]==value]
-        hue[img[:,0]==value] = (0.0 + ((img[:,1]-img[:,2]) / (value - img_min + eps)) [img[:,0]==value]) % 6
+        hue[img[:,2]==value] = 4 + ( (img[:,0]-img[:,1]) / (value - img_min + eps)) [img[:,2]==value]
+        hue[img[:,1]==value] = 2 + ( (img[:,2]-img[:,0]) / (value - img_min + eps)) [img[:,1]==value]
+        hue[img[:,0]==value] = (0 + ((img[:,1]-img[:,2]) / (value - img_min + eps)) [img[:,0]==value]) % 6
 
         hue[img.min(1)[0]==value] = 0.0
         hue = hue/6.0
