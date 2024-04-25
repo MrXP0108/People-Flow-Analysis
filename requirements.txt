@@ -1,5 +1,5 @@
 # BEFORE YOUR pip install...
-# 1. follow the steps in https://blog.csdn.net/bluishglc/article/details/128889935
+# 1. install Microsoft Visual C++ (follow the steps in https://blog.csdn.net/bluishglc/article/details/128889935)
 # 2. run "pip install setuptools"
 # 3. run "python -m pip install pip==21.1.1"
 

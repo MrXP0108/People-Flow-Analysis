@@ -1,14 +1,13 @@
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-import argparse
-from enhancement.data.data import *
 from torchvision import transforms
-from torch.utils.data import DataLoader
 from enhancement.loss.losses import *
 from enhancement.net.CIDNet import CIDNet
+from PIL import Image
+import cv2
 import numpy as np
 
-device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class Enhancer:
     def __init__(self, perc=False, lol=False, lol_v2_real=False, lol_v2_syn=False, \
@@ -58,7 +57,9 @@ class Enhancer:
         self.eval_net.eval()
 
     def enhance(self, img):
-        eval_data = torch.from_numpy(np.expand_dims(img, axis=0))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        eval_data = Image.fromarray(img)
+        eval_data = transforms.ToTensor()(eval_data).unsqueeze(0)
         torch.set_grad_enabled(False)
         if self.lol:
             self.eval_net.trans.gated = True
@@ -66,15 +67,18 @@ class Enhancer:
             self.eval_net.trans.gated2 = True
             self.eval_net.trans.alpha = self.alpha
         with torch.no_grad():
-            input = eval_data.cuda()
+            input = eval_data.to(device)
             output = self.eval_net(input)
                 
-        output = torch.clamp(output.cuda(),0,1).cuda()
-        output_img = transforms.ToPILImage()(output.squeeze(0))
-        output_img.save('temp/temp.png')
+        output = torch.clamp(output.to(device),0,1).to(device)
+        output_img = np.asarray(transforms.ToPILImage()(output.squeeze(0)))
+        output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
+
         torch.cuda.empty_cache()
         if self.lol:
             self.eval_net.trans.gated = False
         else:
             self.eval_net.trans.gated2 = False
         torch.set_grad_enabled(True)
+
+        return output_img

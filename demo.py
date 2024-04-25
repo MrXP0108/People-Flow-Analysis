@@ -2,7 +2,7 @@ import torch
 from torchvision import transforms
 from ultralytics import YOLO
 from PIL import ImageFont, ImageDraw, Image
-import os,cv2
+import cv2
 import argparse
 import matplotlib.pyplot as plt
 
@@ -13,7 +13,7 @@ import numpy as np
 
 from enhancement.enhancement import Enhancer
 
-device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # 定义一个Detection类，包含id,bb_left,bb_top,bb_width,bb_height,conf,det_class
 class Detection:
@@ -141,9 +141,7 @@ def main(args):
 
         # low-light enhancement
         # TODO: enhance if brightness is under some threshold
-        if frame_id % 100 == 10:
-            enhancer.enhance(cv2.cvtColor(frame_img, cv2.COLOR_BGR2RGB))
-            frame_img = cv2.imread('temp/temp.png')
+        frame_img = enhancer.enhance(frame_img)
 
         if frame_id == 1:
             if height >= 700: entrance_manager.factor = 2.5

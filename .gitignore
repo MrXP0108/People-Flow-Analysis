@@ -144,7 +144,7 @@ results/
 error_log.txt
 dance_detections/
 kitti_test/
-
+demo/
 
 # IDE
 .vs
