@@ -148,6 +148,7 @@ demo/
 
 # IDE
 .vs
+.vscode
 
 record/
 output/

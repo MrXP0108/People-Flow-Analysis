@@ -184,7 +184,7 @@ class UCMCTrack(object):
     
     def initial_tentative(self,dets):
         for i in self.detidx_remain: 
-            self.trackers.append(KalmanTracker(dets[i].y,dets[i].R,self.wx,self.wy,self.vmax, dets[i].bb_width,dets[i].bb_height,self.dt))
+            self.trackers.append(KalmanTracker(dets[i].y,dets[i].R,self.wx,self.wy,self.vmax, dets[i].bb_w,dets[i].bb_h,self.dt))
             self.trackers[-1].status = TrackStatus.Tentative
             self.trackers[-1].detidx = i
         self.detidx_remain = []
@@ -208,8 +208,8 @@ class UCMCTrack(object):
 
             detidx = self.trackers[i].detidx
             if detidx >= 0 and detidx < len(dets):
-                self.trackers[i].h = dets[detidx].bb_height
-                self.trackers[i].w = dets[detidx].bb_width
+                self.trackers[i].h = dets[detidx].bb_h
+                self.trackers[i].w = dets[detidx].bb_w
 
             if self.trackers[i].status == TrackStatus.Confirmed:
                 self.confirmed_idx.append(i)
