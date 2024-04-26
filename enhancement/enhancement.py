@@ -38,19 +38,16 @@ class Enhancer:
         elif self.lol_v2_real:
             if self.best_GT_mean:
                 weight_path = 'enhancement/weights/LOLv2_real/w_perc.pth'
-                self.alpha = 0.84
             elif self.best_PSNR:
                 weight_path = 'enhancement/weights/LOLv2_real/best_PSNR.pth'
-                self.alpha = 0.8
             elif self.best_SSIM:
                 weight_path = 'enhancement/weights/LOLv2_real/best_SSIM.pth'
-                self.alpha = 0.82
                 
         elif self.lol_v2_syn:
             if self.perc:
                 weight_path = 'enhancement/weights/LOLv2_syn/w_perc.pth'
             else:
-                weight_path = 'enhancement/weights/LOLv2_syn/DVCNet_epoch_320_best.pth'
+                weight_path = 'enhancement/weights/LOLv2_syn/wo_perc.pth'
 
         self.eval_net = CIDNet().to(device)
         self.eval_net.load_state_dict(torch.load(weight_path, map_location=lambda storage, loc: storage))

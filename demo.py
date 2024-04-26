@@ -52,13 +52,13 @@ class Detector:
         self.mapper = Mapper(cam_para_file,"MOT17")
         self.model = YOLO(f'pretrained/yolov{args.yolo_version}.pt').to(device)
 
-    def get_dets(self, img,conf_thresh = 0,det_classes = [0]):
+    def get_dets(self, frame_img,conf_thresh = 0,det_classes = [0]):
         
         global dets
         dets = []
 
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img_tensor = transforms.ToTensor()(img).unsqueeze(0).to(device)
+        frame_img = cv2.cvtColor(frame_img, cv2.COLOR_BGR2RGB)
+        img_tensor = transforms.ToTensor()(frame_img).unsqueeze(0).to(device)
 
         results = self.model(img_tensor)
 
@@ -117,7 +117,7 @@ def main(args):
     entrance_manager = EntranceManager(f'{args.source_folder}/{args.entrance_coords}')
     entrance_coords = entrance_manager.coords
 
-    enhancer = Enhancer(lol_v2_real=True, best_GT_mean=True)
+    enhancer = Enhancer(lol_v2_syn=True, perc=True, alpha=1.0)
 
     n_person = 0
     in_pos_count = [0]*len(entrance_manager.coords)
@@ -127,16 +127,16 @@ def main(args):
     frame_id = 1
     stop = False
     while True:
-        ret, img = cap.read()
+        ret, frame_img = cap.read()
         if not ret:
             break
-        h, w = img.shape[:2]
+        h, w = frame_img.shape[:2]
 
         # low-light enhancement
         # TODO: enhance if brightness is under some threshold:
-        # frame_img = enhancer.enhance(img) if frame_id % 100 == 10 else img
-        frame_img = enhancer.enhance(img)
-        
+        frame_img = enhancer.enhance(frame_img)
+        frame_img = cv2.convertScaleAbs(frame_img, alpha=1.0, beta=50)
+        frame_img = cv2.fastNlMeansDenoisingColored(frame_img, None, 10, 10, 7, 21)
 
         if frame_id == 1:
             if h >= 700 or w >= 700: entrance_manager.factor = 2.5
@@ -150,11 +150,10 @@ def main(args):
             (int(w / entrance_manager.factor) // 32 * 32,
              int(h / entrance_manager.factor) // 32 * 32))
     
-        if frame_id % args.detect_freq == 1:
-            dets = detector.get_dets(frame_img,args.conf_thresh)
-            all_out_pos = track_manager.update(dets,frame_id)
-            for out_pos in all_out_pos:
-                out_pos_count[out_pos] += 1
+        dets = detector.get_dets(frame_img,args.conf_thresh)
+        all_out_pos = track_manager.update(dets,frame_id)
+        for out_pos in all_out_pos:
+            out_pos_count[out_pos] += 1
 
         # 標示進出口
         if args.show_entrances:
