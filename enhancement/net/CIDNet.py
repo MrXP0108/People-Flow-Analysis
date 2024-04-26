@@ -6,6 +6,8 @@ from enhancement.net.HVI_transform import RGB_HVI
 from enhancement.net.transformer_utils import *
 from enhancement.net.LCA import *
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 class CIDNet(nn.Module):
     def __init__(self, 
                  channels=[36, 36, 72, 144],
@@ -67,8 +69,7 @@ class CIDNet(nn.Module):
         self.I_LCA5 = I_LCA(ch3, head3)
         self.I_LCA6 = I_LCA(ch2, head2)
         
-        # self.trans = RGB_HVI().cuda()
-        self.trans = RGB_HVI().cpu()
+        self.trans = RGB_HVI().to(device)
         
     def forward(self, x):
         dtypes = x.dtype

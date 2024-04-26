@@ -1,6 +1,8 @@
+import torch
+from torchvision import transforms
 from ultralytics import YOLO
 from PIL import ImageFont, ImageDraw, Image
-import os,cv2
+import cv2
 import argparse
 import matplotlib.pyplot as plt
 
@@ -11,15 +13,17 @@ import numpy as np
 
 from enhancement.enhancement import Enhancer
 
-# 定义一个Detection类，包含id,bb_left,bb_top,bb_width,bb_height,conf,det_class
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+# 定义一个Detection类，包含id,bb_left,bb_top,bb_w,bb_h,conf,det_class
 class Detection:
 
-    def __init__(self, id, bb_left = 0, bb_top = 0, bb_width = 0, bb_height = 0, conf = 0, det_class = 0):
+    def __init__(self, id, bb_left = 0, bb_top = 0, bb_w = 0, bb_h = 0, conf = 0, det_class = 0):
         self.id = id
         self.bb_left = bb_left
         self.bb_top = bb_top
-        self.bb_width = bb_width
-        self.bb_height = bb_height
+        self.bb_w = bb_w
+        self.bb_h = bb_h
         self.conf = conf
         self.det_class = det_class
         self.track_id = 0
@@ -29,14 +33,14 @@ class Detection:
 
     def __str__(self):
         return 'd{}, bb_box:[{},{},{},{}], conf={:.2f}, class{}, uv:[{:.0f},{:.0f}], mapped to:[{:.1f},{:.1f}]'.format(
-            self.id, self.bb_left, self.bb_top, self.bb_width, self.bb_height, self.conf, self.det_class,
-            self.bb_left+self.bb_width/2,self.bb_top+self.bb_height,self.y[0,0],self.y[1,0])
+            self.id, self.bb_left, self.bb_top, self.bb_w, self.bb_h, self.conf, self.det_class,
+            self.bb_left+self.bb_w/2,self.bb_top+self.bb_h,self.y[0,0],self.y[1,0])
 
     def __repr__(self):
         return self.__str__()
 
     def get_coord(self):
-        return [int(self.bb_left), int(self.bb_top), int(self.bb_left+self.bb_width), int(self.bb_top+self.bb_height)]
+        return [int(self.bb_left), int(self.bb_top), int(self.bb_left+self.bb_w), int(self.bb_top+self.bb_h)]
 
 # Detector类，用于从Yolo检测器获取目标检测的结果
 class Detector:
@@ -46,24 +50,23 @@ class Detector:
 
     def load(self,cam_para_file):
         self.mapper = Mapper(cam_para_file,"MOT17")
-        self.model = YOLO(f'pretrained/yolov{args.yolo_version}.pt')
+        self.model = YOLO(f'pretrained/yolov{args.yolo_version}.pt').to(device)
 
-    def get_dets(self, img,conf_thresh = 0,det_classes = [0]):
+    def get_dets(self, frame_img,conf_thresh = 0,det_classes = [0]):
         
         global dets
         dets = []
 
-        # 将帧从 BGR 转换为 RGB（因为 OpenCV 使用 BGR 格式）  
-        frame = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  
+        frame_img = cv2.cvtColor(frame_img, cv2.COLOR_BGR2RGB)
+        img_tensor = transforms.ToTensor()(frame_img).unsqueeze(0).to(device)
 
-        # 使用 RTDETR 进行推理  
-        results = self.model(frame)
+        results = self.model(img_tensor)
 
         det_id = 0
         for box in results[0].boxes:
-            conf = box.conf.cpu().numpy()[0]
-            bbox = box.xyxy.cpu().numpy()[0]
-            cls_id  = box.cls.cpu().numpy()[0]
+            conf = box.conf.to('cpu').numpy()[0]
+            bbox = box.xyxy.to('cpu').numpy()[0]
+            cls_id  = box.cls.to('cpu').numpy()[0]
             w = bbox[2] - bbox[0]
             h = bbox[3] - bbox[1]
             if w <= 20 and h <= 20 or cls_id not in det_classes or conf <= conf_thresh:
@@ -73,11 +76,11 @@ class Detector:
             det = Detection(det_id)
             det.bb_left = bbox[0]
             det.bb_top = bbox[1]
-            det.bb_width = w
-            det.bb_height = h
+            det.bb_w = w
+            det.bb_h = h
             det.conf = conf
             det.det_class = cls_id
-            det.y,det.R = self.mapper.mapto([det.bb_left,det.bb_top,det.bb_width,det.bb_height])
+            det.y,det.R = self.mapper.mapto([det.bb_left,det.bb_top,det.bb_w,det.bb_h])
             det_id += 1
 
             dets.append(det)
@@ -90,11 +93,11 @@ def update_value_display(n_person, in_pos_count, out_pos_count):
     font = ImageFont.truetype(fontpath, 20)
     img_pil = Image.fromarray(value_display)
 
-    ImageDraw.Draw(img_pil).text((10, 10), f'畫面總人數：{n_person}', stroke_width=10, stroke_fill='black', fill=255, font=font)
+    ImageDraw.Draw(img_pil).text((10, 10), f'畫面總人數：{n_person}', stroke_w=10, stroke_fill='black', fill=255, font=font)
     for i in range(len(in_pos_count)):
-        ImageDraw.Draw(img_pil).text((10, 30*i+50), f'。由 {i} 號口進入：{in_pos_count[i]}', stroke_width=10, stroke_fill='black', fill=255, font=font)
+        ImageDraw.Draw(img_pil).text((10, 30*i+50), f'。由 {i} 號口進入：{in_pos_count[i]}', stroke_w=10, stroke_fill='black', fill=255, font=font)
     for i in range(len(out_pos_count)):
-        ImageDraw.Draw(img_pil).text((250, 30*i+50), f'。由 {i} 號口離開：{out_pos_count[i]}', stroke_width=10, stroke_fill='black', fill=255, font=font)
+        ImageDraw.Draw(img_pil).text((250, 30*i+50), f'。由 {i} 號口離開：{out_pos_count[i]}', stroke_w=10, stroke_fill='black', fill=255, font=font)
     value_display = np.array(img_pil)
     cv2.imshow('Values', value_display)
 
@@ -114,7 +117,7 @@ def main(args):
     entrance_manager = EntranceManager(f'{args.source_folder}/{args.entrance_coords}')
     entrance_coords = entrance_manager.coords
 
-    enhancer = Enhancer(lol=True, perc=True)
+    enhancer = Enhancer(lol_v2_syn=True, perc=True, alpha=1.0)
 
     n_person = 0
     in_pos_count = [0]*len(entrance_manager.coords)
@@ -127,30 +130,30 @@ def main(args):
         ret, frame_img = cap.read()
         if not ret:
             break
-        height, width = frame_img.shape[:2]
+        h, w = frame_img.shape[:2]
 
         # low-light enhancement
-        # TODO: enhance if brightness is under some threshold
-        if frame_id % 100 == 10:
-            cv2.imwrite('temp/temp.png', frame_img)
-            enhancer.enhance()
-            frame_img = cv2.imread('temp/temp.png')
+        # TODO: enhance if brightness is under some threshold:
+        frame_img = enhancer.enhance(frame_img)
+        frame_img = cv2.convertScaleAbs(frame_img, alpha=1.0, beta=50)
+        frame_img = cv2.fastNlMeansDenoisingColored(frame_img, None, 10, 10, 7, 21)
 
         if frame_id == 1:
-            if height >= 700: entrance_manager.factor = 2.5
-            if height <= 300:  entrance_manager.factor = 0.5
+            if h >= 700 or w >= 700: entrance_manager.factor = 2.5
+            if h <= 300:  entrance_manager.factor = 0.5
             for coord in reversed(entrance_coords):
                 coord[0] = int(coord[0] / entrance_manager.factor)
                 coord[1] = int(coord[1] / entrance_manager.factor)
                 coord[2] = int(coord[2] / entrance_manager.factor)
                 coord[3] = int(coord[3] / entrance_manager.factor)
-        frame_img = cv2.resize(frame_img, (int(width / entrance_manager.factor), int(height / entrance_manager.factor)))
+        frame_img = cv2.resize(frame_img, \
+            (int(w / entrance_manager.factor) // 32 * 32,
+             int(h / entrance_manager.factor) // 32 * 32))
     
-        if frame_id % args.detect_freq == 1:
-            dets = detector.get_dets(frame_img,args.conf_thresh)
-            all_out_pos = track_manager.update(dets,frame_id)
-            for out_pos in all_out_pos:
-                out_pos_count[out_pos] += 1
+        dets = detector.get_dets(frame_img,args.conf_thresh)
+        all_out_pos = track_manager.update(dets,frame_id)
+        for out_pos in all_out_pos:
+            out_pos_count[out_pos] += 1
 
         # 標示進出口
         if args.show_entrances:
