@@ -49,7 +49,8 @@ class Enhancer:
             else:
                 weight_path = 'enhancement/weights/LOLv2_syn/wo_perc.pth'
 
-        self.eval_net = CIDNet().to(device)
+        self.eval_net = CIDNet()
+        self.eval_net.to(device)
         self.eval_net.load_state_dict(torch.load(weight_path, map_location=lambda storage, loc: storage))
         self.eval_net.eval()
 

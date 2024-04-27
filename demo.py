@@ -134,9 +134,8 @@ def main(args):
 
         # low-light enhancement
         # TODO: enhance if brightness is under some threshold:
-        frame_img = enhancer.enhance(frame_img)
+        # frame_img = enhancer.enhance(frame_img)
         frame_img = cv2.convertScaleAbs(frame_img, alpha=1.0, beta=50)
-        frame_img = cv2.fastNlMeansDenoisingColored(frame_img, None, 10, 10, 7, 21)
 
         if frame_id == 1:
             if h >= 700 or w >= 700: entrance_manager.factor = 2.5

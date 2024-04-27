@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
+import numpy
 
 pi = 3.141592653589793
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class RGB_HVI(nn.Module):
     def __init__(self):
@@ -47,7 +49,7 @@ class RGB_HVI(nn.Module):
     
     def PHVIT(self, img):
         eps = 1e-8
-        H,V,I = img[:,0,:,:],img[:,1,:,:],img[:,2,:,:]
+        H,V,I = img[:,0,:,:], img[:,1,:,:], img[:,2,:,:]
         
         # clip
         H = torch.clamp(H,-1,1)
@@ -81,36 +83,53 @@ class RGB_HVI(nn.Module):
         q = v * (1. - (f * s))
         t = v * (1. - ((1. - f) * s))
         
-        hi0 = hi==0
-        hi1 = hi==1
-        hi2 = hi==2
-        hi3 = hi==3
-        hi4 = hi==4
-        hi5 = hi==5
-        
-        r[hi0] = v[hi0]
-        g[hi0] = t[hi0]
-        b[hi0] = p[hi0]
-        
-        r[hi1] = q[hi1]
-        g[hi1] = v[hi1]
-        b[hi1] = p[hi1]
-        
-        r[hi2] = p[hi2]
-        g[hi2] = v[hi2]
-        b[hi2] = t[hi2]
-        
-        r[hi3] = p[hi3]
-        g[hi3] = q[hi3]
-        b[hi3] = v[hi3]
-        
-        r[hi4] = t[hi4]
-        g[hi4] = p[hi4]
-        b[hi4] = v[hi4]
-        
-        r[hi5] = v[hi5]
-        g[hi5] = p[hi5]
-        b[hi5] = q[hi5]
+        # Convert tensors to NumPy arrays
+        hi_np = hi.cpu().numpy()
+        r_np = r.cpu().numpy()
+        g_np = g.cpu().numpy()
+        b_np = b.cpu().numpy()
+        p_np = p.cpu().numpy()
+        q_np = q.cpu().numpy()
+        t_np = t.cpu().numpy()
+        v_np = v.cpu().numpy()
+
+        # Convert hi_np to boolean arrays
+        hi0 = hi_np == 0
+        hi1 = hi_np == 1
+        hi2 = hi_np == 2
+        hi3 = hi_np == 3
+        hi4 = hi_np == 4
+        hi5 = hi_np == 5
+
+        # Perform computations with NumPy arrays
+        r_np[hi0] = v_np[hi0]
+        g_np[hi0] = t_np[hi0]
+        b_np[hi0] = p_np[hi0]
+
+        r_np[hi1] = q_np[hi1]
+        g_np[hi1] = v_np[hi1]
+        b_np[hi1] = p_np[hi1]
+
+        r_np[hi2] = p_np[hi2]
+        g_np[hi2] = v_np[hi2]
+        b_np[hi2] = t_np[hi2]
+
+        r_np[hi3] = p_np[hi3]
+        g_np[hi3] = q_np[hi3]
+        b_np[hi3] = v_np[hi3]
+
+        r_np[hi4] = t_np[hi4]
+        g_np[hi4] = p_np[hi4]
+        b_np[hi4] = v_np[hi4]
+
+        r_np[hi5] = v_np[hi5]
+        g_np[hi5] = p_np[hi5]
+        b_np[hi5] = q_np[hi5]
+
+        # Convert NumPy arrays back to tensors
+        r = torch.tensor(r_np, device=r.device)
+        g = torch.tensor(g_np, device=g.device)
+        b = torch.tensor(b_np, device=b.device)
                 
         r = r.unsqueeze(1)
         g = g.unsqueeze(1)
