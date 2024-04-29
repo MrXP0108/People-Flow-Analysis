@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy
+import numpy as np
 
 pi = 3.141592653589793
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -73,10 +73,6 @@ class RGB_HVI(nn.Module):
         s = torch.clamp(s,0,1)
         v = torch.clamp(v,0,1)
         
-        r = torch.zeros_like(h)
-        g = torch.zeros_like(h)
-        b = torch.zeros_like(h)
-        
         hi = torch.floor(h * 6.0)
         f = h * 6.0 - hi
         p = v * (1. - s)
@@ -85,9 +81,9 @@ class RGB_HVI(nn.Module):
         
         # Convert tensors to NumPy arrays
         hi_np = hi.cpu().numpy()
-        r_np = r.cpu().numpy()
-        g_np = g.cpu().numpy()
-        b_np = b.cpu().numpy()
+        r_np = np.zeros_like(hi_np)
+        g_np = np.zeros_like(hi_np)
+        b_np = np.zeros_like(hi_np)
         p_np = p.cpu().numpy()
         q_np = q.cpu().numpy()
         t_np = t.cpu().numpy()
@@ -127,13 +123,10 @@ class RGB_HVI(nn.Module):
         b_np[hi5] = q_np[hi5]
 
         # Convert NumPy arrays back to tensors
-        r = torch.tensor(r_np, device=r.device)
-        g = torch.tensor(g_np, device=g.device)
-        b = torch.tensor(b_np, device=b.device)
+        r = torch.tensor(r_np, device=device).unsqueeze(1)
+        g = torch.tensor(g_np, device=device).unsqueeze(1)
+        b = torch.tensor(b_np, device=device).unsqueeze(1)
                 
-        r = r.unsqueeze(1)
-        g = g.unsqueeze(1)
-        b = b.unsqueeze(1)
         rgb = torch.cat([r, g, b], dim=1)
         if self.gated2:
             rgb = rgb * self.alpha

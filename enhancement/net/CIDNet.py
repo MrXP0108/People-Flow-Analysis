@@ -6,8 +6,6 @@ from enhancement.net.HVI_transform import RGB_HVI
 from enhancement.net.transformer_utils import *
 from enhancement.net.LCA import *
 
-import timeit
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class CIDNet(nn.Module):
@@ -120,13 +118,9 @@ class CIDNet(nn.Module):
         i_dec0 = self.ID_block0(i_dec1)
         hv_1 = self.HVD_block1(hv_1, hv_jump0)
         hv_0 = self.HVD_block0(hv_1)
-
-        start_time = timeit.default_timer()
         
         output_hvi = torch.cat([hv_0, i_dec0], dim=1) + hvi
         output_rgb = self.trans.PHVIT(output_hvi)
-
-        print(f'elapse: {timeit.default_timer() - start_time}')
 
         return output_rgb
     

@@ -11,7 +11,10 @@ from detector.mapper import Mapper
 from util.mark_entrance import EntranceManager
 import numpy as np
 
-from enhancement.enhancement import Enhancer
+from enhancement.lowlight import Enhancer
+from enhancement.tampering import TamperHandler
+
+import timeit
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -116,26 +119,56 @@ def main(args):
 
     entrance_manager = EntranceManager(f'{args.source_folder}/{args.entrance_coords}')
     entrance_coords = entrance_manager.coords
-
-    enhancer = Enhancer(lol_v2_syn=True, perc=True, alpha=1.0)
-
     n_person = 0
     in_pos_count = [0]*len(entrance_manager.coords)
     out_pos_count = [0]*len(entrance_manager.coords)
 
-    # 循环读取视频帧
+    enhancer = Enhancer(lol_v2_syn=True, perc=True, alpha=1.0)
+
+    handler = TamperHandler()
+
     frame_id = 1
     stop = False
     while True:
         ret, frame_img = cap.read()
-        if not ret:
+        if handler.fixed_tamper_flag or not ret:
+            handler.show_result()
             break
         h, w = frame_img.shape[:2]
 
-        # low-light enhancement
-        # TODO: enhance if brightness is under some threshold:
-        # frame_img = enhancer.enhance(frame_img)
-        frame_img = cv2.convertScaleAbs(frame_img, alpha=1.0, beta=50)
+        handler.detect(frame_img.copy(), frame_id, visualized=False)
+
+        frame_id += 1
+
+        #######################################################################
+
+        # temp = cv2.resize(frame_img, (300, 300))
+        # temp2 = temp.copy()
+        # frame_grayscaled = cv2.cvtColor(temp, cv2.COLOR_BGR2GRAY)
+        # brightness = cv2.mean(frame_grayscaled)[0]
+        # cv2.putText(temp, str(brightness), (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        # cv2.imshow('BEFORE', temp)
+        # cv2.moveWindow('BEFORE', 900, 100)
+        # key = cv2.waitKey(50)
+        # if key == ord('q'): break
+
+        # # TODO: enhance() is weirdly slow
+        # # start_time = timeit.default_timer()
+        # # frame_img = enhancer.enhance(frame_img)
+        # # print(f'elapse: {timeit.default_timer() - start_time}')
+
+        # if brightness < 80 and brightness > 20:
+        #     temp2 = cv2.convertScaleAbs(temp2, alpha=1.5, beta=50)
+        # elif brightness <= 20:
+        #     temp2 = cv2.convertScaleAbs(temp2, alpha=1.7, beta=70)
+        # frame_grayscaled2 = cv2.cvtColor(temp2, cv2.COLOR_BGR2GRAY)
+        # brightness2 = cv2.mean(frame_grayscaled2)[0]
+        # cv2.putText(temp2, str(brightness2), (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        # cv2.imshow('AFTER', temp2)
+        # cv2.moveWindow('AFTER', 500, 100)
+        # key = cv2.waitKey(50)
+        # if key == ord('q'): break
+        # continue
 
         if frame_id == 1:
             if h >= 700 or w >= 700: entrance_manager.factor = 2.5
