@@ -1,5 +1,3 @@
-import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 from torchvision import transforms
 from enhancement.loss.losses import *
 from enhancement.net.CIDNet import CIDNet
@@ -9,7 +7,7 @@ import numpy as np
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-class Enhancer:
+class LowLightEnhancer:
     def __init__(self, perc=False, lol=False, lol_v2_real=False, lol_v2_syn=False, \
                  best_GT_mean=False, best_PSNR=False, best_SSIM=False, alpha=1.0):
         self.perc = perc

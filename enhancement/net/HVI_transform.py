@@ -67,8 +67,7 @@ class RGB_HVI(nn.Module):
         h = h%1
         s = torch.sqrt(H**2 + V**2)
         
-        if self.gated:
-            s = s * 1.3
+        if self.gated: s *= 1.3
         
         s = torch.clamp(s,0,1)
         v = torch.clamp(v,0,1)
@@ -81,46 +80,18 @@ class RGB_HVI(nn.Module):
         
         # Convert tensors to NumPy arrays
         hi_np = hi.cpu().numpy()
-        r_np = np.zeros_like(hi_np)
-        g_np = np.zeros_like(hi_np)
-        b_np = np.zeros_like(hi_np)
         p_np = p.cpu().numpy()
         q_np = q.cpu().numpy()
         t_np = t.cpu().numpy()
         v_np = v.cpu().numpy()
 
-        # Convert hi_np to boolean arrays
-        hi0 = hi_np == 0
-        hi1 = hi_np == 1
-        hi2 = hi_np == 2
-        hi3 = hi_np == 3
-        hi4 = hi_np == 4
-        hi5 = hi_np == 5
+        # Create boolean arrays directly
+        hi_eq = (hi_np == np.arange(6)[:, None, None])
 
-        # Perform computations with NumPy arrays
-        r_np[hi0] = v_np[hi0]
-        g_np[hi0] = t_np[hi0]
-        b_np[hi0] = p_np[hi0]
-
-        r_np[hi1] = q_np[hi1]
-        g_np[hi1] = v_np[hi1]
-        b_np[hi1] = p_np[hi1]
-
-        r_np[hi2] = p_np[hi2]
-        g_np[hi2] = v_np[hi2]
-        b_np[hi2] = t_np[hi2]
-
-        r_np[hi3] = p_np[hi3]
-        g_np[hi3] = q_np[hi3]
-        b_np[hi3] = v_np[hi3]
-
-        r_np[hi4] = t_np[hi4]
-        g_np[hi4] = p_np[hi4]
-        b_np[hi4] = v_np[hi4]
-
-        r_np[hi5] = v_np[hi5]
-        g_np[hi5] = p_np[hi5]
-        b_np[hi5] = q_np[hi5]
+        # Perform computations using NumPy vectorized operations
+        r_np = np.where(hi_eq[0], v_np, np.where(hi_eq[1], q_np, np.where(hi_eq[2], p_np, np.where(hi_eq[3], p_np, np.where(hi_eq[4], t_np, v_np)))))
+        g_np = np.where(hi_eq[0], t_np, np.where(hi_eq[1], v_np, np.where(hi_eq[2], v_np, np.where(hi_eq[3], q_np, np.where(hi_eq[4], p_np, p_np)))))
+        b_np = np.where(hi_eq[0], p_np, np.where(hi_eq[1], p_np, np.where(hi_eq[2], t_np, np.where(hi_eq[3], v_np, np.where(hi_eq[4], v_np, q_np)))))
 
         # Convert NumPy arrays back to tensors
         r = torch.tensor(r_np, device=device).unsqueeze(1)
@@ -128,6 +99,5 @@ class RGB_HVI(nn.Module):
         b = torch.tensor(b_np, device=device).unsqueeze(1)
                 
         rgb = torch.cat([r, g, b], dim=1)
-        if self.gated2:
-            rgb = rgb * self.alpha
+        if self.gated2: rgb *= self.alpha
         return rgb
