@@ -69,10 +69,10 @@ def main(args):
 
         handler.detect(frame_img.copy(), frame_id, visualized=False)
 
-        # brightness = cv2.mean(cv2.cvtColor(frame_img, cv2.COLOR_BGR2GRAY))[0]
-        # if brightness < 80 and brightness > 20:
-        #     frame_img = enhancer.enhance(frame_img)
-        #     frame_img = cv2.convertScaleAbs(frame_img, alpha=1.5, beta=50)
+        brightness = cv2.mean(cv2.cvtColor(frame_img, cv2.COLOR_BGR2GRAY))[0]
+        if args.enhance_lowlight and brightness < 80:
+            frame_img = enhancer.enhance(frame_img)
+            frame_img = cv2.convertScaleAbs(frame_img, alpha=1.5, beta=50)
 
         h, w = frame_img.shape[:2]
         if frame_id == 1:
@@ -145,6 +145,7 @@ parser.add_argument('--high_score', type=float, default=0.3, help='high score th
 parser.add_argument('--conf_thresh', type=float, default=0.01, help='detection confidence threshold')
 parser.add_argument('--detect_freq', type=int, default=10, help='frequency of YOLO detection')
 parser.add_argument('--show_entrances', type=bool, default=True, help='show the bounding boxes of entrances or not')
+parser.add_argument('--enhance_lowlight', type=bool, default=False, help='enhance the frame image in low-light')
 args = parser.parse_args()
 
 if __name__ == '__main__':
