@@ -186,7 +186,7 @@ class UCMCTrack(object):
             trk.death_count += 1
             i -= 1 
             if ( trk.status == TrackStatus.Coasted and trk.death_count >= self.max_age) or ( trk.status == TrackStatus.Tentative and trk.death_count >= 2):
-                if trk.in_pos == -1:
+                if trk.in_pos == -1 or trk.out_pos == -1:
                     continue
                 if trk.in_pos == trk.out_pos:
                     invalid_in_pos.append(self.trackers[i].out_pos)

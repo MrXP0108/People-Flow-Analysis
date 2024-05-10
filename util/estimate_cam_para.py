@@ -161,7 +161,7 @@ def main(args):
                 u,v = xy2uv(x,y,Ki,Ko)
                 cv2.circle(img, (u-200,v-200), 3, (0,255,0), -1)
 
-        cv2.imshow('img', img)
+        cv2.imshow('Estimate Camera Parameter', img)
         if cv2.waitKey(50) & 0xFF == ord('q'): break
 
     with open(f'{args.source_folder}/{args.cam_para}', 'w') as f:

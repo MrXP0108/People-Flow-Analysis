@@ -27,6 +27,7 @@ pip install -r requirements.txt
 ```powershell
 # 請根據 nvidia-smi 的狀態自行設定 CUDA 版本
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu[version]
+pip install cupy-cuda[version]
 ```
 
 ### 必要套件與檔案

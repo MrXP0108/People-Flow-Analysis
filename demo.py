@@ -37,6 +37,7 @@ def show_camera_warning():
 
 def automatic_brightness_and_contrast(image, clip_hist_percent=1):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    brightness = cv2.mean(gray)[0]
     
     # Calculate grayscale histogram
     hist = cv2.calcHist([gray],[0],None,[256],[0,256])
@@ -77,6 +78,8 @@ def automatic_brightness_and_contrast(image, clip_hist_percent=1):
     '''
 
     auto_result = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
+    sharpen_filter = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+    auto_result = cv2.filter2D(auto_result, -1, sharpen_filter)
     return (auto_result, alpha, beta)
 
 def main(args):
@@ -108,7 +111,7 @@ def main(args):
         if not ret: break
         if handler.fixed_tamper_flag:
             show_camera_warning()
-            # handler.show_result()
+            if args.show_tamper_handler: handler.show_result()
 
         # brightness = cv2.mean(cv2.cvtColor(frame_img, cv2.COLOR_BGR2GRAY))[0]
         # if args.enhance_lowlight and brightness < 80:
@@ -116,7 +119,7 @@ def main(args):
         #     frame_img = cv2.convertScaleAbs(frame_img, alpha=1.5, beta=50)
         frame_img, alpha, beta = automatic_brightness_and_contrast(frame_img)
 
-        handler.detect(frame_img.copy(), frame_id, visualized=False)
+        handler.detect(frame_img.copy(), frame_id, args.tamp_thresh, visualized=args.show_tamper_handler)
 
         h, w = frame_img.shape[:2]
         if frame_id == 1:
@@ -172,13 +175,14 @@ def main(args):
     
     cap.release()
     cv2.destroyAllWindows()
+    handler.show_result(force_show=True)
 
 parser = argparse.ArgumentParser(description='Process some arguments.')
-parser.add_argument('--yolo_version', type=str, default = "8m", help='used YOLO version')
-parser.add_argument('--source_folder', type=str, default = "demo/demo", help='folder for video, cam_para and entrance_coords')
-parser.add_argument('--video', type=str, default = "demo.mp4", help='video file name')
-parser.add_argument('--cam_para', type=str, default = "cam_para_test.txt", help='camera parameter file name')
-parser.add_argument('--entrance_coords', type=str, default = "entrance_coords.txt", help='coordinates of all entrances')
+parser.add_argument('-y', '--yolo_version', type=str, default = "8m", help='used YOLO version')
+parser.add_argument('-s', '--source_folder', type=str, default = "demo/demo", help='folder for video, cam_para and entrance_coords')
+parser.add_argument('-v', '--video', type=str, default = "demo.mp4", help='video file name')
+parser.add_argument('-c', '--cam_para', type=str, default = "cam_para_test.txt", help='camera parameter file name')
+parser.add_argument('-e', '--entrance_coords', type=str, default = "entrance_coords.txt", help='coordinates of all entrances')
 parser.add_argument('--wx', type=float, default=5, help='wx')
 parser.add_argument('--wy', type=float, default=5, help='wy')
 parser.add_argument('--vmax', type=float, default=10, help='vmax')
@@ -186,7 +190,9 @@ parser.add_argument('--a', type=float, default=100.0, help='assignment threshold
 parser.add_argument('--cdt', type=int, default=5, help='coasted deletion time')
 parser.add_argument('--high_score', type=float, default=0.3, help='high score threshold')
 parser.add_argument('--conf_thresh', type=float, default=0.01, help='detection confidence threshold')
+parser.add_argument('--tamp_thresh', type=int, default=30, help='tampering confidence threshold')
 parser.add_argument('--show_entrances', action='store_true', help='show the bounding boxes of entrances or not')
+parser.add_argument('--show_tamper_handler', action='store_true', help='visualize the process of tamper handling')
 parser.add_argument('--enhance_lowlight', action='store_true', help='enhance the frame image in low-light')
 args = parser.parse_args()
 

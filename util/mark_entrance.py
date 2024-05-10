@@ -53,13 +53,13 @@ def main(args):
 
     clean_img = img.copy()
 
-    cv2.namedWindow('出入口標示')
-    cv2.setMouseCallback('出入口標示', entrance_manager.set_coord)
+    cv2.namedWindow('Mark Entrance')
+    cv2.setMouseCallback('Mark Entrance', entrance_manager.set_coord)
     for coord in entrance_manager.coords:
         draw_entrance_box(coord, entrance_manager.factor)
 
     while True:
-        cv2.imshow('出入口標示', img)
+        cv2.imshow('Mark Entrance', img)
 
         key = cv2.waitKey(50)
         # q: 離開

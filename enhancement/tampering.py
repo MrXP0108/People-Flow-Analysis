@@ -19,13 +19,15 @@ class TamperHandler:
         self.bg_temp = None  # to save temp background
         self.w = 200         # size of the tamper validation window (length)   (w > t_fix)
 
+        self.result_is_shown = False
+
         # store list for plot
         self.aedr_list = []
         self.edr_list = []
         self.aedr_th_list = []
         self.th_list = []
 
-    def detect(self, frame, frame_id, visualized=False):
+    def detect(self, frame, frame_id, threshold, visualized=False):
         frame = cv2.resize(frame, (320, 240))
         if visualized:
             cv2.imshow('frame_rgb', frame)
@@ -97,7 +99,7 @@ class TamperHandler:
 
                 self.tamper_flag_count += self.tamper_flag
 
-                if self.tamper_validation_count > 30:
+                if self.tamper_validation_count > threshold:
                     self.fixed_tamper_flag = True
 
             self.aedr_list.append(self.aedr)
@@ -107,19 +109,21 @@ class TamperHandler:
 
             if visualized: cv2.waitKey(10)
 
-    def show_result(self):
-        plt.figure(figsize=(16, 9))
-        plt.plot(self.aedr_list, 'r', label='AEDR')
-        plt.plot(self.edr_list, 'b', linestyle = ':', label='EDR')
-        plt.plot(self.aedr_th_list, 'g', linestyle = '-.', label='AEDR + TH')
-        plt.plot(self.th_list, 'brown', linestyle = '--', label='TH')
-        plt.ylim([0, 1])
-        plt.xlim([0, len(self.th_list)])
-        plt.title('If the blue line exceeds the green line, it is camera tamper attack')
-        plt.xlabel('Frame number')
-        plt.ylabel('Edge disappearance ratio')
-        plt.legend()
-        plt.show()
+    def show_result(self, force_show=False):
+        if not (force_show and self.result_is_shown):
+            plt.figure(figsize=(16, 9))
+            plt.plot(self.aedr_list, 'r', label='AEDR')
+            plt.plot(self.edr_list, 'b', linestyle = ':', label='EDR')
+            plt.plot(self.aedr_th_list, 'g', linestyle = '-.', label='AEDR + TH')
+            plt.plot(self.th_list, 'brown', linestyle = '--', label='TH')
+            plt.ylim([0, 1])
+            plt.xlim([0, len(self.th_list)])
+            plt.title('If the blue line exceeds the green line, it is camera tamper attack')
+            plt.xlabel('Frame number')
+            plt.ylabel('Edge disappearance ratio')
+            plt.legend()
+            plt.show()
+            self.result_is_shown = True
 
     def sobel_edge_detection(self, image_gray, blur_ksize=7, sobel_ksize=1, skipping_threshold=10):
         """
@@ -195,3 +199,7 @@ class TamperHandler:
             tamper_validation_count
         '''
         return min(tamper_validation_count + 1, w) if edr > aedr + th else max(tamper_validation_count - 1, 0)
+    
+    def clear_fixed_tamper_flag(self):
+        self.fixed_tamper_flag = False
+        self.result_is_shown = False
