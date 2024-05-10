@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import cupy as cp
 
 pi = 3.141592653589793
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -77,26 +78,48 @@ class RGB_HVI(nn.Module):
         p = v * (1. - s)
         q = v * (1. - (f * s))
         t = v * (1. - ((1. - f) * s))
-        
-        # Convert tensors to NumPy arrays
-        hi_np = hi.cpu().numpy()
-        p_np = p.cpu().numpy()
-        q_np = q.cpu().numpy()
-        t_np = t.cpu().numpy()
-        v_np = v.cpu().numpy()
+        r, g, b = None, None, None
 
-        # Create boolean arrays directly
-        hi_eq = (hi_np == np.arange(6)[:, None, None])
+        if device == 'cuda':
+            # Convert tensors to CuPy arrays directly on GPU
+            hi_cp = cp.asarray(hi)
+            p_cp = cp.asarray(p)
+            q_cp = cp.asarray(q)
+            t_cp = cp.asarray(t)
+            v_cp = cp.asarray(v)
 
-        # Perform computations using NumPy vectorized operations
-        r_np = np.where(hi_eq[0], v_np, np.where(hi_eq[1], q_np, np.where(hi_eq[2], p_np, np.where(hi_eq[3], p_np, np.where(hi_eq[4], t_np, v_np)))))
-        g_np = np.where(hi_eq[0], t_np, np.where(hi_eq[1], v_np, np.where(hi_eq[2], v_np, np.where(hi_eq[3], q_np, np.where(hi_eq[4], p_np, p_np)))))
-        b_np = np.where(hi_eq[0], p_np, np.where(hi_eq[1], p_np, np.where(hi_eq[2], t_np, np.where(hi_eq[3], v_np, np.where(hi_eq[4], v_np, q_np)))))
+            # Create boolean arrays directly on GPU
+            hi_eq = (hi_cp == cp.arange(6)[:, None, None])
 
-        # Convert NumPy arrays back to tensors
-        r = torch.tensor(r_np, device=device).unsqueeze(1)
-        g = torch.tensor(g_np, device=device).unsqueeze(1)
-        b = torch.tensor(b_np, device=device).unsqueeze(1)
+            # Perform computations using CuPy vectorized operations
+            r_cp = cp.where(hi_eq[0], v_cp, cp.where(hi_eq[1], q_cp, cp.where(hi_eq[2], p_cp, cp.where(hi_eq[3], p_cp, cp.where(hi_eq[4], t_cp, v_cp)))))
+            g_cp = cp.where(hi_eq[0], t_cp, cp.where(hi_eq[1], v_cp, cp.where(hi_eq[2], v_cp, cp.where(hi_eq[3], q_cp, cp.where(hi_eq[4], p_cp, p_cp)))))
+            b_cp = cp.where(hi_eq[0], p_cp, cp.where(hi_eq[1], p_cp, cp.where(hi_eq[2], t_cp, cp.where(hi_eq[3], v_cp, cp.where(hi_eq[4], v_cp, q_cp)))))
+
+            # Convert CuPy arrays back to tensors on GPU
+            r = torch.tensor(cp.asnumpy(r_cp), device=device).unsqueeze(1)
+            g = torch.tensor(cp.asnumpy(g_cp), device=device).unsqueeze(1)
+            b = torch.tensor(cp.asnumpy(b_cp), device=device).unsqueeze(1)
+        else:
+            # Convert tensors to NumPy arrays
+            hi_np = hi.cpu().numpy()
+            p_np = p.cpu().numpy()
+            q_np = q.cpu().numpy()
+            t_np = t.cpu().numpy()
+            v_np = v.cpu().numpy()
+
+            # Create boolean arrays directly
+            hi_eq = (hi_np == np.arange(6)[:, None, None])
+
+            # Perform computations using NumPy vectorized operations
+            r_np = np.where(hi_eq[0], v_np, np.where(hi_eq[1], q_np, np.where(hi_eq[2], p_np, np.where(hi_eq[3], p_np, np.where(hi_eq[4], t_np, v_np)))))
+            g_np = np.where(hi_eq[0], t_np, np.where(hi_eq[1], v_np, np.where(hi_eq[2], v_np, np.where(hi_eq[3], q_np, np.where(hi_eq[4], p_np, p_np)))))
+            b_np = np.where(hi_eq[0], p_np, np.where(hi_eq[1], p_np, np.where(hi_eq[2], t_np, np.where(hi_eq[3], v_np, np.where(hi_eq[4], v_np, q_np)))))
+
+            # Convert NumPy arrays back to tensors
+            r = torch.tensor(r_np, device=device).unsqueeze(1)
+            g = torch.tensor(g_np, device=device).unsqueeze(1)
+            b = torch.tensor(b_np, device=device).unsqueeze(1)
                 
         rgb = torch.cat([r, g, b], dim=1)
         if self.gated2: rgb *= self.alpha

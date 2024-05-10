@@ -75,15 +75,15 @@ class KalmanTracker(object):
                 self.max_ios = cur_ios
                 pos = i
         
-        if self.max_ios == 0.0: return False
+        self.max_ios *= 0.95
+        if self.max_ios == 0.0:
+            return False
         if self.is_new:
             self.in_pos = pos
-            self.max_ios = 0.0
             self.is_new = False
             return True
-        else:
-            self.out_pos = pos
-            return False
+        self.out_pos = pos
+        return False
 
     # intersection over self (bb_det)
     def ios(self, bb_det,bb_comp):

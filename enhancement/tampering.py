@@ -71,16 +71,17 @@ class TamperHandler:
             e_c[mask_to_exclude] = 0
             edr = 1 - (np.sum(e_bg & e_c)) / (np.sum(e_bg) + 1)     # +1 avoid 0/0
 
-            contours, _ = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            m = 0.0
-            for contour in contours:
-                # 計算輪廓的面積
-                area = cv2.contourArea(contour)
-                m = max(m, area)
-                # 如果輪廓面積大於一定閾值，認為畫面中有一大塊白色
-                if area > (320 * 240 / 2):
-                    self.fixed_tamper_flag = True
-                    break
+            # TODO: 改善遮擋偵測演算法
+            # contours, _ = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # m = 0.0
+            # for contour in contours:
+            #     # 計算輪廓的面積
+            #     area = cv2.contourArea(contour)
+            #     m = max(m, area)
+            #     # 如果輪廓面積大於一定閾值，認為畫面中有一大塊白色
+            #     if area > (320 * 240 / 2):
+            #         self.fixed_tamper_flag = True
+            #         break
             
             # aedr
             if self.tamper_flag == 0: # If any tamper attack occurs, the AEDR keeps the current value

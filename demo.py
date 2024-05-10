@@ -16,15 +16,14 @@ from enhancement.tampering import TamperHandler
 font = ImageFont.truetype('fonts/GenRyuMin.ttc', 20)
 
 def show_updated_analysis(n_person, in_pos_count, out_pos_count):
-    img = np.zeros((400, 270), dtype=np.uint8)
+    img = np.zeros((400, 500), dtype=np.uint8)
     img_pil = Image.fromarray(img)
 
-    text_total = f'畫面總人數：{n_person}'
-    ImageDraw.Draw(img_pil).text((10, 10), text_total, stroke_w=10, stroke_fill='black', fill=255, font=font)
+    ImageDraw.Draw(img_pil).text((10, 10), f'畫面總人數：{n_person}', stroke_w=10, stroke_fill='black', fill=255, font=font)
     for i in range(len(in_pos_count)):
-        text_entrance = f'{i} 號出入口內部人數：{out_pos_count[i] - in_pos_count[i]}'
-        ImageDraw.Draw(img_pil).text((10, 30*i+100), text_entrance, stroke_w=10, stroke_fill='black', fill=255, font=font)
-    
+        ImageDraw.Draw(img_pil).text((10, 30*i+50), f'。由 {i} 號口進入：{in_pos_count[i]}', stroke_w=10, stroke_fill='black', fill=255, font=font)
+    for i in range(len(out_pos_count)):
+        ImageDraw.Draw(img_pil).text((250, 30*i+50), f'。由 {i} 號口離開：{out_pos_count[i]}', stroke_w=10, stroke_fill='black', fill=255, font=font)
     img = np.array(img_pil)
     cv2.imshow('Values', img)
 
@@ -35,6 +34,50 @@ def show_camera_warning():
     ImageDraw.Draw(img_pil).text((30, 30), '攝影機受到干擾！', stroke_w=10, stroke_fill='black', fill=255, font=font)
     img = np.array(img_pil)
     cv2.imshow('!!!', img)
+
+def automatic_brightness_and_contrast(image, clip_hist_percent=1):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # Calculate grayscale histogram
+    hist = cv2.calcHist([gray],[0],None,[256],[0,256])
+    hist_size = len(hist)
+    
+    # Calculate cumulative distribution from the histogram
+    accumulator = []
+    accumulator.append(float(hist[0]))
+    for index in range(1, hist_size):
+        accumulator.append(accumulator[index -1] + float(hist[index]))
+    
+    # Locate points to clip
+    maximum = accumulator[-1]
+    clip_hist_percent *= (maximum/100.0)
+    clip_hist_percent /= 2.0
+    
+    # Locate left cut
+    minimum_gray = 0
+    while accumulator[minimum_gray] < clip_hist_percent:
+        minimum_gray += 1
+    
+    # Locate right cut
+    maximum_gray = hist_size -1
+    while accumulator[maximum_gray] >= (maximum - clip_hist_percent):
+        maximum_gray -= 1
+    
+    # Calculate alpha and beta values
+    alpha = 255 / (maximum_gray - minimum_gray)
+    beta = -minimum_gray * alpha
+    
+    '''
+    # Calculate new histogram with desired range and show histogram 
+    new_hist = cv2.calcHist([gray],[0],None,[256],[minimum_gray,maximum_gray])
+    plt.plot(hist)
+    plt.plot(new_hist)
+    plt.xlim([0,256])
+    plt.show()
+    '''
+
+    auto_result = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
+    return (auto_result, alpha, beta)
 
 def main(args):
 
@@ -50,7 +93,7 @@ def main(args):
     detector = Detector(args.yolo_version, f'{args.source_folder}/{args.cam_para}')
     
     # person tracking
-    track_manager = UCMCTrack(args.a, args.a, args.wx, args.wy, args.vmax, args.cdt, fps, "MOT", args.high_score,False,None)
+    track_manager = UCMCTrack(args.a, args.a, args.wx, args.wy, args.vmax, args.cdt, fps, args.high_score)
 
     # entrance managing
     entrance_manager = EntranceManager(f'{args.source_folder}/{args.entrance_coords}')
@@ -67,12 +110,13 @@ def main(args):
             show_camera_warning()
             # handler.show_result()
 
-        handler.detect(frame_img.copy(), frame_id, visualized=False)
+        # brightness = cv2.mean(cv2.cvtColor(frame_img, cv2.COLOR_BGR2GRAY))[0]
+        # if args.enhance_lowlight and brightness < 80:
+        #     frame_img = enhancer.enhance(frame_img)
+        #     frame_img = cv2.convertScaleAbs(frame_img, alpha=1.5, beta=50)
+        frame_img, alpha, beta = automatic_brightness_and_contrast(frame_img)
 
-        brightness = cv2.mean(cv2.cvtColor(frame_img, cv2.COLOR_BGR2GRAY))[0]
-        if args.enhance_lowlight and brightness < 80:
-            frame_img = enhancer.enhance(frame_img)
-            frame_img = cv2.convertScaleAbs(frame_img, alpha=1.5, beta=50)
+        handler.detect(frame_img.copy(), frame_id, visualized=False)
 
         h, w = frame_img.shape[:2]
         if frame_id == 1:
@@ -86,9 +130,11 @@ def main(args):
         frame_img = cv2.resize(frame_img, \
             (int(w / entrance_manager.factor) // 32 * 32,
              int(h / entrance_manager.factor) // 32 * 32))
-    
+
         dets = detector.get_dets(frame_img,args.conf_thresh)
-        all_out_pos = track_manager.update(dets,frame_id)
+        invalid_in_pos, all_out_pos = track_manager.update(dets,frame_id)
+        for in_pos in invalid_in_pos:
+            in_pos_count[in_pos] -= 1
         for out_pos in all_out_pos:
             out_pos_count[out_pos] += 1
 
@@ -117,9 +163,6 @@ def main(args):
                 if tracker.update_pos(det.get_coord(), entrance_coords):
                     in_pos_count[tracker.in_pos] += 1
 
-                # 逐次降低 max_ios 以避免角度造成現在靠近的 ios 不夠大
-                tracker.max_ios *= 0.95
-
         show_updated_analysis(n_person, in_pos_count, out_pos_count)        
         cv2.imshow('People Flow Analysis', frame_img)
         if cv2.waitKey(50) & 0xFF == ord('q'): break
@@ -132,7 +175,7 @@ def main(args):
 
 parser = argparse.ArgumentParser(description='Process some arguments.')
 parser.add_argument('--yolo_version', type=str, default = "8m", help='used YOLO version')
-parser.add_argument('--source_folder', type=str, default = "demo/demo5", help='folder for video, cam_para and entrance_coords')
+parser.add_argument('--source_folder', type=str, default = "demo/demo", help='folder for video, cam_para and entrance_coords')
 parser.add_argument('--video', type=str, default = "demo.mp4", help='video file name')
 parser.add_argument('--cam_para', type=str, default = "cam_para_test.txt", help='camera parameter file name')
 parser.add_argument('--entrance_coords', type=str, default = "entrance_coords.txt", help='coordinates of all entrances')
@@ -143,9 +186,8 @@ parser.add_argument('--a', type=float, default=100.0, help='assignment threshold
 parser.add_argument('--cdt', type=int, default=5, help='coasted deletion time')
 parser.add_argument('--high_score', type=float, default=0.3, help='high score threshold')
 parser.add_argument('--conf_thresh', type=float, default=0.01, help='detection confidence threshold')
-parser.add_argument('--detect_freq', type=int, default=10, help='frequency of YOLO detection')
-parser.add_argument('--show_entrances', type=bool, default=True, help='show the bounding boxes of entrances or not')
-parser.add_argument('--enhance_lowlight', type=bool, default=False, help='enhance the frame image in low-light')
+parser.add_argument('--show_entrances', action='store_true', help='show the bounding boxes of entrances or not')
+parser.add_argument('--enhance_lowlight', action='store_true', help='enhance the frame image in low-light')
 args = parser.parse_args()
 
 if __name__ == '__main__':
