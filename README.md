@@ -30,16 +30,12 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 pip install cupy-cuda[version]
 ```
 
-### 必要套件與檔案
+### 必要檔案與環境變數
 
 - **中文字型**
   
-  本專案預設使用源流明體，請自 [官方出處](https://github.com/ButTaiwan/genryu-font/tree/master) 下載並置於 `/fonts`。
+  本專案預設使用源流明體，請自 [官方出處](https://github.com/ButTaiwan/genryu-font/tree/master) 下載並置於根目錄。
   
-- **影像增強的 pre-trained weights**：
-  
-  請至 [HVI-CIDNet 原作者的 repository](https://github.com/Fediory/HVI-CIDNet/tree/master?tab=readme-ov-file#weights-and-results-) 下載並置於 `enhancement/weights`。
-
 ## 操作方法
 
 > [!NOTE]  
@@ -50,8 +46,7 @@ pip install cupy-cuda[version]
 將物理平面校正為實際的拍攝角度：
 
 ```powershell
-# 影片名稱預設為 demo.mp4
-python util/estimate_cam_para.py --source_folder [影片所在的資料夾路徑] --video [影片的完整名稱]
+python util/estimate_cam_para.py -s [影片所在的資料夾路徑] -v [影片的完整名稱]
 ```
 
 詳細的後續操作請參照原作者 [UCMCTrack](https://github.com/corfyi/UCMCTrack/tree/master?tab=readme-ov-file#-camera-parameter-estimation-tool) 的教學步驟。
@@ -61,8 +56,7 @@ python util/estimate_cam_para.py --source_folder [影片所在的資料夾路徑
 手動標示畫面上的出入口以便人流追蹤：
 
 ```powershell
-# 影片名稱預設為 demo.mp4
-python util/mark_entrance.py --source_folder [影片所在的資料夾路徑] --video [影片的完整名稱]
+python util/mark_entrance.py -s [影片所在的資料夾路徑] -v [影片的完整名稱]
 ```
 
 逐次分別點選出入口所在的**左上角**與**右下角**即可完成註冊，若要重新選取請按 <kbd>c</kbd> 以清除記錄。
@@ -74,7 +68,11 @@ python util/mark_entrance.py --source_folder [影片所在的資料夾路徑] --
 輸入以下指令後即可開始進行人流追蹤：
 
 ```powershell
-# 預設的 YOLO 版本為 8m
-# 影片名稱預設為 demo.mp4
-python demo.py --yolo_version [使用的 YOLO 版本] --source_folder [影片所在的資料夾路徑] --video [影片的完整名稱]
+python demo.py -y [使用的 YOLO 版本] -s [影片所在的資料夾路徑] -v [影片的完整名稱]
+```
+
+其餘的參數定義與使用方法請參考
+
+```powershell
+python demo.py --help
 ```
