@@ -22,26 +22,20 @@ def linear_assignment(cost_matrix, thresh):
     return matches, unmatched_a, unmatched_b
 
 class UCMCTrack(object):
-    def __init__(self,a1,a2,wx, wy,vmax, max_age, fps, dataset, high_score, use_cmc,detector = None):
+    def __init__(self,a1,a2,wx, wy,vmax, max_age, fps, high_score):
         self.wx = wx
         self.wy = wy
         self.vmax = vmax
-        self.dataset = dataset
         self.high_score = high_score
         self.max_age = max_age
         self.a1 = a1
         self.a2 = a2
         self.dt = 1.0/fps
 
-        self.use_cmc = use_cmc
-
         self.trackers = []
         self.confirmed_idx = []
         self.coasted_idx = []
         self.tentative_idx = []
-
-        self.detector = detector
-
 
     def update(self, dets,frame_id):
         
@@ -51,11 +45,11 @@ class UCMCTrack(object):
         
         self.initial_tentative(dets)
         
-        all_out_pos = self.delete_old_trackers()
+        invalid_in_pos, all_out_pos = self.delete_old_trackers()
         
         self.update_status(dets)
         
-        return all_out_pos
+        return invalid_in_pos, all_out_pos
     
     def data_association(self, dets,frame_id):
         # Separate detections into high score and low score
@@ -70,10 +64,6 @@ class UCMCTrack(object):
         # Predcit new locations of tracks
         for track in self.trackers:
             track.predict()
-            if self.use_cmc:
-                x,y = self.detector.cmc(track.kf.x[0,0],track.kf.x[2,0],track.w,track.h,frame_id)
-                track.kf.x[0,0] = x
-                track.kf.x[2,0] = y
         
         trackidx_remain = []
         self.detidx_remain = []
@@ -190,15 +180,20 @@ class UCMCTrack(object):
         self.detidx_remain = []
 
     def delete_old_trackers(self):
-        all_out_pos = []
+        invalid_in_pos, all_out_pos = [], []
         i = len(self.trackers)
         for trk in reversed(self.trackers):
             trk.death_count += 1
             i -= 1 
             if ( trk.status == TrackStatus.Coasted and trk.death_count >= self.max_age) or ( trk.status == TrackStatus.Tentative and trk.death_count >= 2):
-                all_out_pos.append(self.trackers[i].out_pos)
+                if trk.in_pos == -1 or trk.out_pos == -1:
+                    continue
+                if trk.in_pos == trk.out_pos:
+                    invalid_in_pos.append(self.trackers[i].out_pos)
+                else:
+                    all_out_pos.append(self.trackers[i].out_pos)
                 self.trackers.pop(i)
-        return all_out_pos
+        return invalid_in_pos, all_out_pos
 
     def update_status(self,dets):
         self.confirmed_idx = []

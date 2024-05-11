@@ -1,7 +1,4 @@
 import numpy as np
-import os
-
-
 
 def getUVError(box):
     u = 0.05*box[3]
@@ -15,36 +12,11 @@ def getUVError(box):
     elif v<2:
         v = 2
     return u,v
-    
 
 def parseToMatrix(data, rows, cols):
     matrix_data = np.fromstring(data, sep=' ')
     matrix_data = matrix_data.reshape((rows, cols))
     return matrix_data
-
-def readKittiCalib(filename):
-    # 检查文件是否存在
-    if not os.path.isfile(filename):
-        print(f"Calib file could not be opened: {filename}")
-        return None,False
-
-    P2 = np.zeros((3, 4))
-    R_rect = np.identity(4)
-    Tr_velo_cam = np.identity(4)
-    KiKo = None
-
-    with open(filename, 'r') as infile:
-        for line in infile:
-            id, data = line.split(' ', 1)
-            if id == "P2:":
-                P2 = parseToMatrix(data, 3, 4)
-            elif id == "R_rect":
-                R_rect[:3, :3] = parseToMatrix(data, 3, 3)
-            elif id == "Tr_velo_cam":
-                Tr_velo_cam[:3, :4] = parseToMatrix(data, 3, 4)
-            KiKo = np.dot(np.dot(P2, R_rect), Tr_velo_cam)
-
-    return KiKo, True
 
 def readCamParaFile(camera_para):
     R = np.zeros((3, 3))
@@ -84,23 +56,16 @@ def readCamParaFile(camera_para):
     Ko[:3, :3] = R
     Ko[:3, 3] = T.flatten()
 
-    KiKo = np.dot(Ki, Ko)
-
     return Ki,Ko,True
 
 class Mapper(object):
-    def __init__(self, campara_file,dataset= "kitti"):
+    def __init__(self, campara_file):
         self.A = np.zeros((3, 3))
-        if dataset == "kitti":
-            self.KiKo, self.is_ok = readKittiCalib(campara_file)
-            z0 = -1.73
-        else:
-            self.Ki,self.Ko, self.is_ok = readCamParaFile(campara_file)
-            self.KiKo = np.dot(self.Ki, self.Ko)
-            z0 = 0
+        self.Ki, self.Ko, self.is_ok = readCamParaFile(campara_file)
+        self.KiKo = np.dot(self.Ki, self.Ko)
 
         self.A[:, :2] = self.KiKo[:, :2]
-        self.A[:, 2] = z0 * self.KiKo[:, 2] + self.KiKo[:, 3]
+        self.A[:, 2] = self.KiKo[:, 3]
         self.InvA = np.linalg.inv(self.A)
 
     def uv2xy(self, uv, sigma_uv):
