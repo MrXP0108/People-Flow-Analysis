@@ -14,6 +14,9 @@ class EntranceManager:
         for coord in data:
             self.coords.append([int(xyxy) for xyxy in coord.split()])
 
+        self.in_pos_count = [0]*len(self.coords)
+        self.out_pos_count = [0]*len(self.coords)
+
     def clear(self):
         open(self.file, 'w').close()
         self.coords.clear()

@@ -4,20 +4,24 @@ import matplotlib.pyplot as plt
 
 class TamperHandler:
     def __init__(self):
-        self.fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
+        self.fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
         self.fgbg.setNMixtures(4)
         self.fgbg.setVarInit(100)
 
         self.t_fix = 100
         self.t_set = 3
-        self.tamper_flag = 0         # f_{n}^{t}
-        self.tamper_flag_count = 0   # count++ if tamper_flag=1
+        self.tamper_flag = False
+        self.tamper_flag_count = 0   # count++ if tamper_flag is true
         self.tamper_validation_count = 0  # S
         self.fixed_tamper_flag = False    # set by hand, turn off by hand
         self.aedr = 0
         self.edr_sum = 0     # sum(edr) if no tamper attack
-        self.bg_temp = None  # to save temp background
         self.w = 200         # size of the tamper validation window (length)   (w > t_fix)
+
+        self.bg = np.zeros((240, 320))
+        self.bg_is_set = False
+        self.e_bg = np.zeros((240, 320))
+        self.fgmask = np.zeros((240, 320))
 
         self.result_is_shown = False
 
@@ -33,48 +37,48 @@ class TamperHandler:
             cv2.imshow('frame_rgb', frame)
             cv2.moveWindow('frame_rgb', 500, 50)
 
-        fgmask = self.fgbg.apply(frame, learningRate = 0.002)
-        fgmask = cv2.erode(fgmask, np.ones((1,1)))
-        fgmask = cv2.dilate(fgmask, np.ones((5, 5)))
+        self.fgmask = self.fgbg.apply(frame, learningRate = 0.002)
+        self.fgmask = cv2.erode(self.fgmask, np.ones((1,1)))
+        self.fgmask = cv2.dilate(self.fgmask, np.ones((5, 5)))
         
-        if self.tamper_flag == 1:
-            bg = self.bg_temp
-        else:
-            bg = self.fgbg.getBackgroundImage()
-            self.bg_temp = bg
+        if not self.bg_is_set:
+            self.bg = self.fgbg.getBackgroundImage()
 
         if visualized:
-            cv2.imshow('fgmask', fgmask)
-            cv2.moveWindow('fgmask', 900, 225)
-            cv2.imshow('bg', bg)
+            cv2.imshow('self.fgmask', self.fgmask)
+            cv2.moveWindow('self.fgmask', 900, 225)
+            cv2.imshow('bg', self.bg)
             cv2.moveWindow('bg', 100, 50)
 
         # serve for edr
-        background_gray = cv2.cvtColor(bg, cv2.COLOR_BGR2GRAY)
+        background_gray = cv2.cvtColor(self.bg, cv2.COLOR_BGR2GRAY)
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         if frame_id > 1:
-            mask_to_exclude = (fgmask == 255)
+            mask_to_exclude = (self.fgmask == 255)
 
-            e_bg = self.sobel_edge_detection(background_gray)
+            if not self.bg_is_set:
+                self.e_bg = self.sobel_edge_detection(background_gray)
+                self.bg_is_set = True
             e_c = self.sobel_edge_detection(frame_gray)
 
             if visualized:
-                cv2.imshow('bg_sobel', e_bg)
+                cv2.imshow('bg_sobel', self.e_bg)
                 cv2.moveWindow('bg_sobel', 100, 400)
                 cv2.imshow('c_sobel', e_c)
                 cv2.moveWindow('c_sobel', 500, 400)
             
             # th
-            th = self.calculate_th(e_bg)
+            th = self.calculate_th()
 
             # calculate edr
-            e_bg[mask_to_exclude] = 0
+            e_bg_temp = self.e_bg.copy()
+            e_bg_temp[mask_to_exclude] = 0
             e_c[mask_to_exclude] = 0
-            edr = 1 - (np.sum(e_bg & e_c)) / (np.sum(e_bg) + 1)     # +1 avoid 0/0
+            edr = 1 - (np.sum(e_bg_temp & e_c)) / (np.sum(e_bg_temp) + 1)     # +1 avoid 0/0
 
             # TODO: 改善遮擋偵測演算法
-            # contours, _ = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # contours, _ = cv2.findContours(self.fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             # m = 0.0
             # for contour in contours:
             #     # 計算輪廓的面積
@@ -86,18 +90,18 @@ class TamperHandler:
             #         break
             
             # aedr
-            if self.tamper_flag == 0: # If any tamper attack occurs, the AEDR keeps the current value
+            if not self.tamper_flag: # If any tamper attack occurs, the AEDR keeps the current value
                 self.edr_sum += edr
-                self.aedr = np.sum((1 - self.tamper_flag) * self.edr_sum) / (frame_id - self.tamper_flag_count)
+                self.aedr = np.sum(self.edr_sum) / (frame_id - self.tamper_flag_count)
 
             if frame_id > self.t_fix:    # generating background before monitoring
                 # tamper validation count:
                 self.tamper_validation_count = self.calculate_tamper_validation_count(self.tamper_validation_count, self.w, edr, self.aedr, th)
 
                 # tamper flag setting:
-                self.tamper_flag = 1 if self.tamper_validation_count > self.t_set else 0
+                self.tamper_flag = self.tamper_validation_count > self.t_set
 
-                self.tamper_flag_count += self.tamper_flag
+                self.tamper_flag_count += (1 if self.tamper_flag else 0)
 
                 if self.tamper_validation_count > threshold:
                     self.fixed_tamper_flag = True
@@ -111,7 +115,7 @@ class TamperHandler:
 
     def show_result(self, force_show=False):
         if not (force_show and self.result_is_shown):
-            plt.figure(figsize=(16, 9))
+            plt.figure(figsize=(10, 5))
             plt.plot(self.aedr_list, 'r', label='AEDR')
             plt.plot(self.edr_list, 'b', linestyle = ':', label='EDR')
             plt.plot(self.aedr_th_list, 'g', linestyle = '-.', label='AEDR + TH')
@@ -122,10 +126,11 @@ class TamperHandler:
             plt.xlabel('Frame number')
             plt.ylabel('Edge disappearance ratio')
             plt.legend()
-            plt.show()
-            self.result_is_shown = True
 
-    def sobel_edge_detection(self, image_gray, blur_ksize=7, sobel_ksize=1, skipping_threshold=10):
+            self.result_is_shown = True
+            plt.show()
+
+    def sobel_edge_detection(self, image_gray, blur_ksize=5, sobel_ksize=1, skipping_threshold=10):
         """
 
         Input:
@@ -140,7 +145,6 @@ class TamperHandler:
             Edge matrix ∈ {0, 255}
         """
         img_blurred = cv2.GaussianBlur(image_gray, (blur_ksize, blur_ksize), 0)
-        # img_blurred = cv2.filter2D(img_blurred, -1, np.array([[-1, -1, -1],[-1,  9, -1],[-1, -1, -1]]))
         img_blurred = cv2.filter2D(img_blurred, -1, np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]]))
         
         # sobel algorthm use cv2.CV_64F
@@ -160,28 +164,28 @@ class TamperHandler:
         img_sobel[img_sobel >= skipping_threshold] = 255
         return np.array(img_sobel, dtype=np.uint8)
 
-    def calculate_th(self, e_bg):
+    def calculate_th(self):
         '''
 
         Input:
         ---
-            e_bg: #edge pixel in the n-th background frame
+            self.e_bg: #edge pixel in the n-th background frame
 
         Output:
         ---
             Adaptive threshold (All the values used in paper)
         '''
-        h, w = e_bg.shape[0], e_bg.shape[1]
-        e_bg = np.sum(e_bg) / 255
+        h, w = self.e_bg.shape[0], self.e_bg.shape[1]
+        sum = np.sum(self.e_bg) / 255
 
-        if e_bg == 0:
+        if sum == 0:
             return -1.0
-        elif e_bg / (w * h) < 0.026 * 2:
-            return 150 / e_bg
-        elif 0.026*2 <= e_bg / (w * h) < 0.046 * 2:
-            return 400 / e_bg
+        elif sum / (w * h) < 0.026 * 2:
+            return 150 / sum
+        elif 0.026*2 <= sum / (w * h) < 0.046 * 2:
+            return 400 / sum
         else:
-            return 1500 / e_bg
+            return 1500 / sum
 
     def calculate_tamper_validation_count(self, tamper_validation_count, w, edr, aedr, th):
         '''

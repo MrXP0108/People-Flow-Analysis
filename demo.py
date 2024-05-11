@@ -35,53 +35,6 @@ def show_camera_warning():
     img = np.array(img_pil)
     cv2.imshow('!!!', img)
 
-def automatic_brightness_and_contrast(image, clip_hist_percent=1):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    brightness = cv2.mean(gray)[0]
-    
-    # Calculate grayscale histogram
-    hist = cv2.calcHist([gray],[0],None,[256],[0,256])
-    hist_size = len(hist)
-    
-    # Calculate cumulative distribution from the histogram
-    accumulator = []
-    accumulator.append(float(hist[0]))
-    for index in range(1, hist_size):
-        accumulator.append(accumulator[index -1] + float(hist[index]))
-    
-    # Locate points to clip
-    maximum = accumulator[-1]
-    clip_hist_percent *= (maximum/100.0)
-    clip_hist_percent /= 2.0
-    
-    # Locate left cut
-    minimum_gray = 0
-    while accumulator[minimum_gray] < clip_hist_percent:
-        minimum_gray += 1
-    
-    # Locate right cut
-    maximum_gray = hist_size -1
-    while accumulator[maximum_gray] >= (maximum - clip_hist_percent):
-        maximum_gray -= 1
-    
-    # Calculate alpha and beta values
-    alpha = 255 / (maximum_gray - minimum_gray)
-    beta = -minimum_gray * alpha
-    
-    '''
-    # Calculate new histogram with desired range and show histogram 
-    new_hist = cv2.calcHist([gray],[0],None,[256],[minimum_gray,maximum_gray])
-    plt.plot(hist)
-    plt.plot(new_hist)
-    plt.xlim([0,256])
-    plt.show()
-    '''
-
-    auto_result = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
-    sharpen_filter = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
-    auto_result = cv2.filter2D(auto_result, -1, sharpen_filter)
-    return (auto_result, alpha, beta)
-
 def main(args):
 
     # video reader
@@ -89,7 +42,7 @@ def main(args):
     fps = cap.get(cv2.CAP_PROP_FPS)
 
     # image enhancement
-    enhancer = LowLightEnhancer(lol_v2_syn=True, perc=True, alpha=1.0)
+    enhancer = LowLightEnhancer()
     handler = TamperHandler()
 
     # person detection
@@ -102,8 +55,6 @@ def main(args):
     entrance_manager = EntranceManager(f'{args.source_folder}/{args.entrance_coords}')
     entrance_coords = entrance_manager.coords
     n_person = 0
-    in_pos_count = [0]*len(entrance_manager.coords)
-    out_pos_count = [0]*len(entrance_manager.coords)
 
     frame_id = 1
     while True:
@@ -111,17 +62,20 @@ def main(args):
         if not ret: break
         if handler.fixed_tamper_flag:
             show_camera_warning()
-            if args.show_tamper_handler: handler.show_result()
-
-        # brightness = cv2.mean(cv2.cvtColor(frame_img, cv2.COLOR_BGR2GRAY))[0]
-        # if args.enhance_lowlight and brightness < 80:
-        #     frame_img = enhancer.enhance(frame_img)
-        #     frame_img = cv2.convertScaleAbs(frame_img, alpha=1.5, beta=50)
-        frame_img, alpha, beta = automatic_brightness_and_contrast(frame_img)
-
-        handler.detect(frame_img.copy(), frame_id, args.tamp_thresh, visualized=args.show_tamper_handler)
-
+            # if args.tamp_test: handler.show_result()
         h, w = frame_img.shape[:2]
+        
+        frame_img = enhancer.enhance(frame_img, \
+            cv2.resize(handler.fgmask, (w, h)),
+            cv2.resize(handler.e_bg, (w, h)))
+
+        handler.detect(frame_img.copy(), frame_id, args.tamp_thresh, visualized=args.tamp_test)
+
+        if args.tamp_test:
+            if cv2.waitKey(10) & 0xFF == ord('q'): break
+            frame_id += 1
+            continue
+
         if frame_id == 1:
             if h >= 700 or w >= 700: entrance_manager.factor = 2.5
             if h <= 300: entrance_manager.factor = 0.5
@@ -137,9 +91,9 @@ def main(args):
         dets = detector.get_dets(frame_img,args.conf_thresh)
         invalid_in_pos, all_out_pos = track_manager.update(dets,frame_id)
         for in_pos in invalid_in_pos:
-            in_pos_count[in_pos] -= 1
+            entrance_manager.in_pos_count[in_pos] -= 1
         for out_pos in all_out_pos:
-            out_pos_count[out_pos] += 1
+            entrance_manager.out_pos_count[out_pos] += 1
 
         # 標示進出口
         if args.show_entrances:
@@ -164,9 +118,9 @@ def main(args):
                 cv2.putText(frame_img, f'id: {det.track_id}, from: {entrance}, to: {exit}', \
                     (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                 if tracker.update_pos(det.get_coord(), entrance_coords):
-                    in_pos_count[tracker.in_pos] += 1
+                    entrance_manager.in_pos_count[tracker.in_pos] += 1
 
-        show_updated_analysis(n_person, in_pos_count, out_pos_count)        
+        show_updated_analysis(n_person, entrance_manager.in_pos_count, entrance_manager.out_pos_count)        
         cv2.imshow('People Flow Analysis', frame_img)
         if cv2.waitKey(50) & 0xFF == ord('q'): break
 
@@ -190,10 +144,9 @@ parser.add_argument('--a', type=float, default=100.0, help='assignment threshold
 parser.add_argument('--cdt', type=int, default=5, help='coasted deletion time')
 parser.add_argument('--high_score', type=float, default=0.3, help='high score threshold')
 parser.add_argument('--conf_thresh', type=float, default=0.01, help='detection confidence threshold')
-parser.add_argument('--tamp_thresh', type=int, default=30, help='tampering confidence threshold')
+parser.add_argument('--tamp_thresh', type=int, default=50, help='tampering confidence threshold')
 parser.add_argument('--show_entrances', action='store_true', help='show the bounding boxes of entrances or not')
-parser.add_argument('--show_tamper_handler', action='store_true', help='visualize the process of tamper handling')
-parser.add_argument('--enhance_lowlight', action='store_true', help='enhance the frame image in low-light')
+parser.add_argument('--tamp_test', action='store_true', help='debug mode for tamper handling')
 args = parser.parse_args()
 
 if __name__ == '__main__':
