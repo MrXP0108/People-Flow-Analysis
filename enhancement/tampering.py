@@ -3,10 +3,15 @@ import cv2
 import matplotlib.pyplot as plt
 
 class TamperHandler:
+
+    def initFGBG(self):
+        fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
+        fgbg.setNMixtures(4)
+        fgbg.setVarInit(100)
+        return fgbg
+
     def __init__(self):
-        self.fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
-        self.fgbg.setNMixtures(4)
-        self.fgbg.setVarInit(100)
+        self.fgbg = self.initFGBG()
 
         self.t_fix = 100
         self.t_set = 3
@@ -40,6 +45,10 @@ class TamperHandler:
         self.fgmask = self.fgbg.apply(frame, learningRate = 0.002)
         self.fgmask = cv2.erode(self.fgmask, np.ones((1,1)))
         self.fgmask = cv2.dilate(self.fgmask, np.ones((5, 5)))
+
+        if np.sum(self.fgmask == 255) > 0.75 * 240 * 320:
+            self.fgbg = self.initFGBG()
+            self.fgmask = np.zeros((240, 320))
         
         if not self.bg_is_set:
             self.bg = self.fgbg.getBackgroundImage()

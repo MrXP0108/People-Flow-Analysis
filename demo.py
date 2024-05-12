@@ -62,21 +62,23 @@ def main(args):
         if not ret: break
         if handler.fixed_tamper_flag:
             show_camera_warning()
-            # if args.tamp_test: handler.show_result()
+            # if args.show_tamp_test: handler.show_result()
         h, w = frame_img.shape[:2]
+        raw_frame_img = frame_img.copy()
         
         frame_img, blurred = enhancer.enhance(frame_img, \
             cv2.resize(handler.fgmask, (w, h)),
             cv2.resize(handler.e_bg, (w, h)))
 
-        handler.detect(blurred, frame_id, args.tamp_thresh, visualized=args.tamp_test)
+        handler.detect(blurred, frame_id, args.tamp_thresh, visualized=args.show_tamp_test)
 
-        if args.tamp_test:
+        if args.show_tamp_test:
             if cv2.waitKey(10) & 0xFF == ord('q'): break
             frame_id += 1
             continue
 
         if frame_id == 1:
+            # TODO: wrap this code block as an EntranceManager function
             if h >= 700 or w >= 700: entrance_manager.factor = 2.5
             if h <= 300: entrance_manager.factor = 0.5
             for coord in reversed(entrance_coords):
@@ -87,6 +89,18 @@ def main(args):
         frame_img = cv2.resize(frame_img, \
             (int(w / entrance_manager.factor) // 32 * 32,
              int(h / entrance_manager.factor) // 32 * 32))
+        
+        if args.show_enhancement_diff:
+            raw_frame_img = cv2.resize(raw_frame_img, \
+                (int(w / entrance_manager.factor) // 32 * 32,
+                 int(h / entrance_manager.factor) // 32 * 32))
+            cv2.imshow('Raw video', raw_frame_img)
+            cv2.moveWindow('Raw video', 100, 400)
+            cv2.imshow('Enhanced video', frame_img)
+            cv2.moveWindow('Enhanced video', 500, 400)
+            if cv2.waitKey(10) & 0xFF == ord('q'): break
+            frame_id += 1
+            continue
 
         dets = detector.get_dets(frame_img,args.conf_thresh)
         invalid_in_pos, all_out_pos = track_manager.update(dets,frame_id)
@@ -129,24 +143,29 @@ def main(args):
     
     cap.release()
     cv2.destroyAllWindows()
-    handler.show_result(force_show=True)
+    if args.show_tamp_test:
+        handler.show_result(force_show=True)
 
 parser = argparse.ArgumentParser(description='Process some arguments.')
+
 parser.add_argument('-y', '--yolo_version', type=str, default = "9e", help='used YOLO version')
 parser.add_argument('-s', '--source_folder', type=str, default = "demo/demo", help='folder for video, cam_para and entrance_coords')
 parser.add_argument('-v', '--video', type=str, default = "demo.mp4", help='video file name')
 parser.add_argument('-c', '--cam_para', type=str, default = "cam_para_test.txt", help='camera parameter file name')
-parser.add_argument('-e', '--entrance_coords', type=str, default = "entrance_coords.txt", help='coordinates of all entrances')
-parser.add_argument('--wx', type=float, default=5, help='wx')
-parser.add_argument('--wy', type=float, default=5, help='wy')
+parser.add_argument('-e', '--entrance_coords', type=str, default = "entrance_coords.txt", help='coordinates of all entrances')\
+
+parser.add_argument('--wx', type=float, default=5, help='wx term of motion noise VCM in Kalman filter')
+parser.add_argument('--wy', type=float, default=5, help='wy term of motion noise VCM in Kalman filter')
 parser.add_argument('--vmax', type=float, default=10, help='vmax')
 parser.add_argument('--a', type=float, default=100.0, help='assignment threshold')
-parser.add_argument('--cdt', type=int, default=5, help='coasted deletion time')
+parser.add_argument('--cdt', type=int, default=5, help='tracking-coasted deletion time')
 parser.add_argument('--high_score', type=float, default=0.3, help='high score threshold')
 parser.add_argument('--conf_thresh', type=float, default=0.01, help='detection confidence threshold')
 parser.add_argument('--tamp_thresh', type=int, default=50, help='tampering confidence threshold')
+
 parser.add_argument('--show_entrances', action='store_true', help='show the bounding boxes of entrances or not')
-parser.add_argument('--tamp_test', action='store_true', help='debug mode for tamper handling')
+parser.add_argument('--show_tamp_test', action='store_true', help='debug mode for tamper handling')
+parser.add_argument('--show_enhancement_diff', action='store_true', help='debug mode for tamper handling')
 args = parser.parse_args()
 
 if __name__ == '__main__':

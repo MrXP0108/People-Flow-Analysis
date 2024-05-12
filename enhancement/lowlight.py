@@ -36,16 +36,17 @@ class LowLightEnhancer:
         alpha = 255 / (maximum_gray - minimum_gray)
         beta = -minimum_gray * alpha
         
-        '''
-        # Calculate new histogram with desired range and show histogram 
-        new_hist = cv2.calcHist([gray],[0],None,[256],[minimum_gray,maximum_gray])
-        plt.plot(hist)
-        plt.plot(new_hist)
-        plt.xlim([0,256])
-        plt.show()
-        '''
+        
+        # # Calculate new histogram with desired range and show histogram 
+        # new_hist = cv2.calcHist([gray[mask]],[0],None,[256],[minimum_gray,maximum_gray])
+        # plt.plot(hist, label='Before enhancement')
+        # plt.plot(new_hist, label='After enhancement')
+        # plt.xlim([0,256])
+        # plt.legend()
+        # plt.show()
 
         enhanced = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
+        # enhanced[~mask] = image[~mask]
         blurred = cv2.convertScaleAbs(enhanced.copy(), alpha=1.5, beta=50)
         blurred = cv2.GaussianBlur(blurred, (25, 25), 0, 0)
         return (enhanced, blurred)
