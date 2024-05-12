@@ -47,7 +47,7 @@ def main(args):
     
     global img
     cap = cv2.VideoCapture(f'{args.source_folder}/{args.video}')
-    ret, img = cap.read()
+    _, img = cap.read()
 
     height, width = img.shape[:2]
     if height >= 700:
@@ -80,8 +80,8 @@ def main(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Process some arguments.')
-    parser.add_argument('--source_folder', type=str, default = "demo/demo5", help='folder for video and entrance_coords')
-    parser.add_argument('--video', type=str, default="demo.mp4",help='video file name')
-    parser.add_argument('--entrance_coords', type=str, default="entrance_coords.txt",help='The coodrinates of the entrance ')
+    parser.add_argument('-s', '--source_folder', type=str, default = "demo/demo5", help='folder for video and entrance_coords')
+    parser.add_argument('-v', '--video', type=str, default="demo.mp4",help='video file name')
+    parser.add_argument('-e', '--entrance_coords', type=str, default="entrance_coords.txt",help='The coodrinates of the entrance ')
     args = parser.parse_args()
     main(args)

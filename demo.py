@@ -65,11 +65,11 @@ def main(args):
             # if args.tamp_test: handler.show_result()
         h, w = frame_img.shape[:2]
         
-        frame_img = enhancer.enhance(frame_img, \
+        frame_img, blurred = enhancer.enhance(frame_img, \
             cv2.resize(handler.fgmask, (w, h)),
             cv2.resize(handler.e_bg, (w, h)))
 
-        handler.detect(frame_img.copy(), frame_id, args.tamp_thresh, visualized=args.tamp_test)
+        handler.detect(blurred, frame_id, args.tamp_thresh, visualized=args.tamp_test)
 
         if args.tamp_test:
             if cv2.waitKey(10) & 0xFF == ord('q'): break
@@ -132,7 +132,7 @@ def main(args):
     handler.show_result(force_show=True)
 
 parser = argparse.ArgumentParser(description='Process some arguments.')
-parser.add_argument('-y', '--yolo_version', type=str, default = "8m", help='used YOLO version')
+parser.add_argument('-y', '--yolo_version', type=str, default = "9e", help='used YOLO version')
 parser.add_argument('-s', '--source_folder', type=str, default = "demo/demo", help='folder for video, cam_para and entrance_coords')
 parser.add_argument('-v', '--video', type=str, default = "demo.mp4", help='video file name')
 parser.add_argument('-c', '--cam_para', type=str, default = "cam_para_test.txt", help='camera parameter file name')

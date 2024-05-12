@@ -123,7 +123,7 @@ def main(args):
     cam_para.open(f'{args.source_folder}/{args.cam_para}')
 
     cap = cv2.VideoCapture(f'{args.source_folder}/{args.video}')
-    ret, img = cap.read()
+    _, img = cap.read()
     h, w = img.shape[:2]
     if h >= 700:
         img = cv2.resize(img, (int(w / 2.5), int(h / 2.5)))
@@ -155,13 +155,15 @@ def main(args):
         Ki[0,0] += g_focal
         Ki[1,1] += g_focal
 
+        clean_img = img.copy()
+
         # x取值范围0-10，间隔0.1
         for x in np.arange(0,10,0.5):
             for y in np.arange(-5,5,0.5):
                 u,v = xy2uv(x,y,Ki,Ko)
-                cv2.circle(img, (u-200,v-200), 3, (0,255,0), -1)
+                cv2.circle(clean_img, (u-300,v-300), 3, (0,255,0), -1)
 
-        cv2.imshow('Estimate Camera Parameter', img)
+        cv2.imshow('Estimate Camera Parameter', clean_img)
         if cv2.waitKey(50) & 0xFF == ord('q'): break
 
     with open(f'{args.source_folder}/{args.cam_para}', 'w') as f:
@@ -183,8 +185,8 @@ def main(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Process some arguments.')
-    parser.add_argument('--source_folder', type=str, default = "demo/demo5", help='folder for video and entrance_coords')
-    parser.add_argument('--video', type=str, default="demo.mp4",help='video file name')
-    parser.add_argument('--cam_para', type=str, default="cam_para_test.txt",help='The estimated camera parameters file ')
+    parser.add_argument('-s', '--source_folder', type=str, default = "demo/demo5", help='folder for video and entrance_coords')
+    parser.add_argument('-v', '--video', type=str, default="demo.mp4",help='video file name')
+    parser.add_argument('-c', '--cam_para', type=str, default="cam_para_test.txt",help='The estimated camera parameters file ')
     args = parser.parse_args()
     main(args)

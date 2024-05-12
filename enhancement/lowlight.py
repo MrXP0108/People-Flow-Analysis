@@ -45,7 +45,7 @@ class LowLightEnhancer:
         plt.show()
         '''
 
-        auto_result = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
-        auto_result = cv2.convertScaleAbs(auto_result, alpha=1.5, beta=50)
-        auto_result = cv2.GaussianBlur(auto_result, (25, 25), 0, 0)
-        return auto_result
+        enhanced = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
+        blurred = cv2.convertScaleAbs(enhanced.copy(), alpha=1.5, beta=50)
+        blurred = cv2.GaussianBlur(blurred, (25, 25), 0, 0)
+        return (enhanced, blurred)
